@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  icspatch:
+    image: icspatch:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - TARGET_TZ=Europe/Zurich
+      - SOURCE_ICS_URL=${SOURCE_ICS_URL:-https://outlook.office365.com/owa/calendar/2daf83a02c4c4f7ca8000d7d213f1ab2@hesge.ch/1793e647678d4b49a1ff87971d4d56654710512652072737128/calendar.ics}
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - icspatch-dev-network
+
+networks:
+  icspatch-dev-network:
+    driver: bridge
+
+
