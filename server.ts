@@ -274,7 +274,221 @@ function transformIcs(ics: string, targetTz: string, overrideExistingTz: boolean
     transformed[prodidIdx] = "PRODID:-//Google Inc//Google Calendar 70.9054//EN";
   }
 
-  return foldICSLines(transformed) + "\r\n"; // ICS should end with CRLF
+  // Fix VEVENT structure: correct malformed descriptions and reorder fields
+  const fixed = fixVEventStructure(transformed);
+
+  return foldICSLines(fixed) + "\r\n"; // ICS should end with CRLF
+}
+
+// Fix VEVENT structure: correct malformed descriptions and reorder fields
+// This ensures Google Calendar compatibility by:
+// 1. Fixing malformed DESCRIPTION fields (incorrect line breaks)
+// 2. Reordering fields to standard iCalendar order (UID, DTSTAMP, DTSTART, DTEND, SUMMARY, DESCRIPTION, etc.)
+function fixVEventStructure(lines: string[]): string[] {
+  const result: string[] = [];
+  let currentVEvent: string[] = [];
+  let insideVEvent = false;
+
+  // Standard field order for VEVENT (RFC 5545 recommended order)
+  const fieldOrder = [
+    'UID',
+    'DTSTAMP',
+    'DTSTART',
+    'DTEND',
+    'DURATION',
+    'RRULE',
+    'RDATE',
+    'EXDATE',
+    'EXRULE',
+    'RECURRENCE-ID',
+    'SUMMARY',
+    'DESCRIPTION',
+    'LOCATION',
+    'CLASS',
+    'PRIORITY',
+    'TRANSP',
+    'STATUS',
+    'SEQUENCE',
+    'ORGANIZER',
+    'ATTENDEE',
+    'CREATED',
+    'LAST-MODIFIED',
+    'URL',
+  ];
+
+  function getFieldName(line: string): string {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) return '';
+    const fieldPart = line.substring(0, colonIdx);
+    const semicolonIdx = fieldPart.indexOf(';');
+    return semicolonIdx === -1 ? fieldPart.toUpperCase() : fieldPart.substring(0, semicolonIdx).toUpperCase();
+  }
+
+  function fixDescription(descLines: string[]): string[] {
+    if (descLines.length === 0) return [];
+    
+    // Extract the actual description content (remove "DESCRIPTION:" prefix and continuation spaces)
+    const descParts: string[] = [];
+    for (const line of descLines) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx !== -1) {
+        // First line: includes "DESCRIPTION:"
+        descParts.push(line.substring(colonIdx + 1));
+      } else if (line.startsWith(' ') || line.startsWith('\t')) {
+        // Continuation line: starts with space/tab
+        descParts.push(line.substring(1));
+      } else {
+        // Shouldn't happen, but handle it
+        descParts.push(line);
+      }
+    }
+    
+    // Join all description parts
+    let fullDesc = descParts.join('');
+    
+    // Fix malformed line breaks at the end
+    // Remove trailing backslash followed by whitespace and newline
+    // Pattern: "text\\\n" or "text\\ \n" should become "text"
+    fullDesc = fullDesc.replace(/\\\s*$/g, '');
+    
+    // Remove any trailing standalone newline characters that shouldn't be there
+    fullDesc = fullDesc.replace(/\n\s*$/g, '');
+    
+    // If description is empty after cleaning, return empty array
+    if (fullDesc.trim().length === 0) {
+      return [];
+    }
+    
+    // Rebuild DESCRIPTION field with proper folding
+    // The folding will be done by foldICSLines later, but we need to ensure
+    // the first line starts with "DESCRIPTION:"
+    const fixed: string[] = [];
+    if (fullDesc.length <= 75) {
+      fixed.push(`DESCRIPTION:${fullDesc}`);
+    } else {
+      // First line: "DESCRIPTION:" + up to 75 chars
+      const firstLineContent = fullDesc.substring(0, 75);
+      fixed.push(`DESCRIPTION:${firstLineContent}`);
+      // Continuation lines: space + up to 74 chars
+      for (let i = 75; i < fullDesc.length; i += 74) {
+        const continuation = fullDesc.substring(i, i + 74);
+        fixed.push(` ${continuation}`);
+      }
+    }
+    
+    return fixed;
+  }
+
+  function sortVEventFields(eventLines: string[]): string[] {
+    const fields = new Map<string, string[]>();
+    const xFields: string[] = []; // X-* fields go at the end
+    const otherFields: string[] = []; // Unknown fields
+
+    let currentField: string | null = null;
+    let currentFieldLines: string[] = [];
+
+    for (const line of eventLines) {
+      const fieldName = getFieldName(line);
+      
+      if (fieldName === '') {
+        // Continuation line
+        if (currentField) {
+          currentFieldLines.push(line);
+        }
+        continue;
+      }
+
+      // Save previous field
+      if (currentField) {
+        if (currentField.startsWith('X-')) {
+          xFields.push(...currentFieldLines);
+        } else if (fieldOrder.includes(currentField)) {
+          fields.set(currentField, currentFieldLines);
+        } else {
+          otherFields.push(...currentFieldLines);
+        }
+        currentFieldLines = [];
+      }
+
+      currentField = fieldName;
+      currentFieldLines.push(line);
+    }
+
+    // Save last field
+    if (currentField) {
+      if (currentField.startsWith('X-')) {
+        xFields.push(...currentFieldLines);
+      } else if (fieldOrder.includes(currentField)) {
+        fields.set(currentField, currentFieldLines);
+      } else {
+        otherFields.push(...currentFieldLines);
+      }
+    }
+
+    // Build sorted result
+    const sorted: string[] = [];
+    
+    // Add fields in standard order
+    for (const fieldName of fieldOrder) {
+      const fieldLines = fields.get(fieldName);
+      if (fieldLines) {
+        // Special handling for DESCRIPTION: fix malformed content
+        if (fieldName === 'DESCRIPTION') {
+          sorted.push(...fixDescription(fieldLines));
+        } else {
+          sorted.push(...fieldLines);
+        }
+      }
+    }
+    
+    // Add other known fields
+    sorted.push(...otherFields);
+    
+    // Add X-* fields at the end
+    sorted.push(...xFields);
+
+    return sorted;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const upper = line.toUpperCase();
+
+    if (upper === 'BEGIN:VEVENT') {
+      insideVEvent = true;
+      currentVEvent = [line];
+      continue;
+    }
+
+    if (upper === 'END:VEVENT') {
+      if (insideVEvent) {
+        // Sort and fix the VEVENT
+        const sorted = sortVEventFields(currentVEvent);
+        result.push(...sorted);
+        result.push('END:VEVENT');
+        currentVEvent = [];
+        insideVEvent = false;
+      } else {
+        result.push(line);
+      }
+      continue;
+    }
+
+    if (insideVEvent) {
+      currentVEvent.push(line);
+    } else {
+      result.push(line);
+    }
+  }
+
+  // Handle case where file ends without END:VEVENT (shouldn't happen, but be safe)
+  if (insideVEvent && currentVEvent.length > 0) {
+    const sorted = sortVEventFields(currentVEvent);
+    result.push(...sorted);
+    result.push('END:VEVENT');
+  }
+
+  return result;
 }
 
 // --- Express route ---------------------------------------------------------
