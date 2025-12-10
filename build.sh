@@ -1,56 +1,56 @@
 #!/bin/bash
 
-# Script de build pour Docker Swarm / Portainer
+# Build script for Docker Swarm / Portainer
 # Usage: ./build.sh [image-name] [--push]
 
 set -e
 
 # Configuration
-IMAGE_NAME=${1:-icspatch:latest}
+IMAGE_NAME=${1:-outlookicsproxy:latest}
 PUSH=false
 
-# Vérifier les arguments
+# Check arguments
 if [ "$2" = "--push" ]; then
     PUSH=true
 fi
 
-echo "🔨 Construction de l'image Docker pour ICS Patch"
-echo "================================================"
+echo "🔨 Building Docker image for Outlook ICS Proxy"
+echo "=============================================="
 echo "Image name: $IMAGE_NAME"
 echo "Push to registry: $PUSH"
 echo ""
 
-# Construire l'image
-echo "🔨 Construction de l'image Docker..."
+# Build the image
+echo "🔨 Building Docker image..."
 docker build -t "$IMAGE_NAME" .
 
-# Vérifier que l'image a été créée
+# Verify that the image was created
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-    echo "❌ Erreur lors de la construction de l'image"
+    echo "❌ Error building the image"
     exit 1
 fi
 
-echo "✅ Image construite avec succès!"
+echo "✅ Image built successfully!"
 
-# Afficher les informations de l'image
+# Display image information
 echo ""
-echo "📊 Informations de l'image:"
-docker image inspect "$IMAGE_NAME" --format "{{.Size}}" | awk '{print "Taille: " $1/1024/1024 " MB"}'
+echo "📊 Image information:"
+docker image inspect "$IMAGE_NAME" --format "{{.Size}}" | awk '{print "Size: " $1/1024/1024 " MB"}'
 docker image inspect "$IMAGE_NAME" --format "{{.Created}}"
 
-# Push vers le registry si demandé
+# Push to registry if requested
 if [ "$PUSH" = true ]; then
     echo ""
-    echo "📤 Push vers le registry..."
+    echo "📤 Pushing to registry..."
     docker push "$IMAGE_NAME"
-    echo "✅ Image poussée vers le registry!"
+    echo "✅ Image pushed to registry!"
 fi
 
 echo ""
-echo "📋 Commandes utiles:"
-echo "  - Déployer: ./deploy.sh icspatch --no-build"
-echo "  - Tester localement: docker run -p 3003:3003 $IMAGE_NAME"
-echo "  - Voir les images: docker images | grep icspatch"
-echo "  - Supprimer l'image: docker rmi $IMAGE_NAME"
+echo "📋 Useful commands:"
+echo "  - Deploy: ./deploy.sh outlookicsproxy --no-build"
+echo "  - Test locally: docker run -p 3003:3003 $IMAGE_NAME"
+echo "  - View images: docker images | grep outlookicsproxy"
+echo "  - Remove image: docker rmi $IMAGE_NAME"
 
 

@@ -1,4 +1,4 @@
-# Fichiers et dossiers à ignorer lors du build Docker
+# Files and directories to ignore during Docker build
 
 # Node.js
 node_modules/
@@ -6,47 +6,47 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Fichiers de build et cache
+# Build and cache files
 dist/
 build/
 .cache/
 .parcel-cache/
 
-# Fichiers de développement
+# Development files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Fichiers de test
+# Test files
 coverage/
 .nyc_output/
 test-results/
 
-# Fichiers de logs
+# Log files
 logs/
 *.log
 
-# Fichiers temporaires
+# Temporary files
 tmp/
 temp/
 .tmp/
 
-# Fichiers système
+# System files
 .DS_Store
 Thumbs.db
 
-# Fichiers Git
+# Git files
 .git/
 .gitignore
 
-# Fichiers Docker
+# Docker files
 Dockerfile*
 docker-compose*.yml
 .dockerignore
 
-# Fichiers d'environnement (sécurité)
+# Environment files (security)
 .env
 .env.local
 .env.*.local
@@ -55,7 +55,7 @@ docker-compose*.yml
 README.md
 *.md
 
-# Fichiers ICS de test (optionnel)
+# Test ICS files (optional)
 *.ics
 
 

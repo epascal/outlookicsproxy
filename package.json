@@ -1,13 +1,23 @@
 {
-  "name": "icspatch",
+  "name": "outlookicsproxy",
   "version": "1.0.0",
-  "description": "",
+  "description": "Express proxy server that fetches Outlook 365 ICS feeds and fixes timezones for Google Calendar compatibility",
   "type": "module",
-  "main": "index.js",
+  "main": "server.ts",
   "scripts": {
+    "start": "node --loader ts-node/esm server.ts",
+    "dev": "node --loader ts-node/esm server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "ics",
+    "icalendar",
+    "outlook",
+    "google-calendar",
+    "timezone",
+    "proxy",
+    "calendar"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

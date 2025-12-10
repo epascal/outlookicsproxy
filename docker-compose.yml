@@ -1,15 +1,15 @@
 version: '3.8'
 
 services:
-  icspatch:
-    image: icspatch:latest
+  outlookicsproxy:
+    image: outlookicsproxy:latest
     ports:
       - "3003:3003"
     environment:
       - NODE_ENV=production
       - PORT=3003
       - TARGET_TZ=Europe/Zurich
-      - SOURCE_ICS_URL=${SOURCE_ICS_URL:-https://outlook.office365.com/owa/calendar/2daf83a02c4c4f7ca8000d7d213f1ab2@hesge.ch/1793e647678d4b49a1ff87971d4d56654710512652072737128/calendar.ics}
+      - SOURCE_ICS_URL=${SOURCE_ICS_URL:-https://outlook.office365.com/owa/calendar/your-calendar-url/calendar.ics}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/calendar.ics"]
@@ -43,7 +43,7 @@ services:
         monitor: 60s
         max_failure_ratio: 0.3
     networks:
-      - icspatch-network
+      - outlookicsproxy-network
     logging:
       driver: "json-file"
       options:
@@ -51,7 +51,7 @@ services:
         max-file: "3"
 
 networks:
-  icspatch-network:
+  outlookicsproxy-network:
     driver: overlay
     attachable: true
     external: false

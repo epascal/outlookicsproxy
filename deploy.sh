@@ -1,79 +1,79 @@
 #!/bin/bash
 
-# Script de déploiement pour Docker Swarm / Portainer
+# Deployment script for Docker Swarm / Portainer
 # Usage: ./deploy.sh [stack-name] [--no-build]
 
 set -e
 
 # Configuration
-STACK_NAME=${1:-icspatch}
-IMAGE_NAME="icspatch:latest"
+STACK_NAME=${1:-outlookicsproxy}
+IMAGE_NAME="outlookicsproxy:latest"
 COMPOSE_FILE="docker-compose.yml"
 NO_BUILD=false
 
-# Vérifier les arguments
+# Check arguments
 if [ "$2" = "--no-build" ]; then
     NO_BUILD=true
 fi
 
-echo "🚀 Déploiement de ICS Patch sur Docker Swarm"
-echo "=============================================="
+echo "🚀 Deploying Outlook ICS Proxy on Docker Swarm"
+echo "==============================================="
 echo "Stack name: $STACK_NAME"
 echo "Image: $IMAGE_NAME"
 echo "Compose file: $COMPOSE_FILE"
 echo "Skip build: $NO_BUILD"
 echo ""
 
-# Vérifier que Docker Swarm est initialisé
+# Verify that Docker Swarm is initialized
 if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
-    echo "❌ Docker Swarm n'est pas initialisé sur ce nœud"
-    echo "💡 Initialisez Docker Swarm avec: docker swarm init"
+    echo "❌ Docker Swarm is not initialized on this node"
+    echo "💡 Initialize Docker Swarm with: docker swarm init"
     exit 1
 fi
 
-# Vérifier que le fichier docker-compose.yml existe
+# Verify that docker-compose.yml file exists
 if [ ! -f "$COMPOSE_FILE" ]; then
-    echo "❌ Fichier $COMPOSE_FILE non trouvé"
+    echo "❌ File $COMPOSE_FILE not found"
     exit 1
 fi
 
-# Construire l'image (sauf si --no-build est spécifié)
+# Build the image (unless --no-build is specified)
 if [ "$NO_BUILD" = false ]; then
-    echo "🔨 Construction de l'image Docker..."
+    echo "🔨 Building Docker image..."
     docker build -t "$IMAGE_NAME" .
     
-    # Tag pour le registry si nécessaire (optionnel)
+    # Tag for registry if needed (optional)
     # docker tag "$IMAGE_NAME" "your-registry.com/$IMAGE_NAME"
     # docker push "your-registry.com/$IMAGE_NAME"
 else
-    echo "⏭️  Construction de l'image ignorée (--no-build)"
+    echo "⏭️  Image build skipped (--no-build)"
 fi
 
-# Vérifier que l'image existe
+# Verify that the image exists
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-    echo "❌ Image $IMAGE_NAME non trouvée. Construisez d'abord l'image ou supprimez --no-build"
+    echo "❌ Image $IMAGE_NAME not found. Build the image first or remove --no-build"
     exit 1
 fi
 
-# Déployer le stack
-echo "📦 Déploiement du stack..."
+# Deploy the stack
+echo "📦 Deploying stack..."
 docker stack deploy -c "$COMPOSE_FILE" "$STACK_NAME"
 
-# Attendre que le service soit prêt
-echo "⏳ Attente du démarrage du service..."
+# Wait for the service to be ready
+echo "⏳ Waiting for service to start..."
 sleep 10
 
-# Vérifier le statut
-echo "📊 Statut du service:"
+# Check status
+echo "📊 Service status:"
 docker service ls --filter name="$STACK_NAME"
 
 echo ""
-echo "✅ Déploiement terminé!"
-echo "🌐 Service accessible sur: http://localhost:3003/calendar.ics"
+echo "✅ Deployment completed!"
+echo "🌐 Service accessible at: http://localhost:3003/calendar.ics"
 echo ""
-echo "📋 Commandes utiles:"
-echo "  - Voir les logs: docker service logs -f ${STACK_NAME}_icspatch"
-echo "  - Voir le statut: docker service ps ${STACK_NAME}_icspatch"
-echo "  - Supprimer le stack: docker stack rm $STACK_NAME"
-echo "  - Mettre à jour: ./deploy.sh $STACK_NAME"
-echo "  - Mettre à jour sans rebuild: ./deploy.sh $STACK_NAME --no-build"
+echo "📋 Useful commands:"
+echo "  - View logs: docker service logs -f ${STACK_NAME}_outlookicsproxy"
+echo "  - View status: docker service ps ${STACK_NAME}_outlookicsproxy"
+echo "  - Remove stack: docker stack rm $STACK_NAME"
+echo "  - Update: ./deploy.sh $STACK_NAME"
+echo "  - Update without rebuild: ./deploy.sh $STACK_NAME --no-build"
