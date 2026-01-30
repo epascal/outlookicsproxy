@@ -452,6 +452,7 @@ function fixVEventStructure(lines: string[]): string[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (typeof line !== 'string') continue;
     const upper = line.toUpperCase();
 
     if (upper === 'BEGIN:VEVENT') {
