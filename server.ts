@@ -87,7 +87,7 @@ function unfoldICSLines(raw: string): string[] {
   return unfolded;
 }
 
-// Fold long lines at 75 octets per RFC5545 (we do a simple 75-char fold; safe for ASCII ICS)
+// Fold long lines at 75 octets per RFC5545 (continuation line = 1 space + max 74 chars = 75 total)
 function foldICSLines(lines: string[]): string {
   const folded: string[] = [];
   for (const line of lines) {
@@ -96,10 +96,14 @@ function foldICSLines(lines: string[]): string {
     } else {
       let idx = 0;
       while (idx < line.length) {
-        const chunk = line.slice(idx, idx + 75);
-        if (idx === 0) folded.push(chunk);
-        else folded.push(" " + chunk); // continuation begins with one space
-        idx += 75;
+        if (idx === 0) {
+          folded.push(line.slice(0, 75));
+          idx = 75;
+        } else {
+          const chunk = line.slice(idx, idx + 74); // 74 chars so " " + chunk = 75 octets total
+          folded.push(" " + chunk);
+          idx += 74;
+        }
       }
     }
   }
@@ -359,20 +363,16 @@ function fixVEventStructure(lines: string[]): string[] {
       return [];
     }
     
-    // Rebuild DESCRIPTION field with proper folding
-    // The folding will be done by foldICSLines later, but we need to ensure
-    // the first line starts with "DESCRIPTION:"
+    // Rebuild DESCRIPTION field with proper folding (max 75 octets per line)
+    const prefix = "DESCRIPTION:";
+    const maxFirstLineContent = 75 - prefix.length; // 63 chars so first line = 75 total
     const fixed: string[] = [];
-    if (fullDesc.length <= 75) {
+    if (fullDesc.length <= maxFirstLineContent) {
       fixed.push(`DESCRIPTION:${fullDesc}`);
     } else {
-      // First line: "DESCRIPTION:" + up to 75 chars
-      const firstLineContent = fullDesc.substring(0, 75);
-      fixed.push(`DESCRIPTION:${firstLineContent}`);
-      // Continuation lines: space + up to 74 chars
-      for (let i = 75; i < fullDesc.length; i += 74) {
-        const continuation = fullDesc.substring(i, i + 74);
-        fixed.push(` ${continuation}`);
+      fixed.push(prefix + fullDesc.substring(0, maxFirstLineContent));
+      for (let i = maxFirstLineContent; i < fullDesc.length; i += 74) {
+        fixed.push(" " + fullDesc.substring(i, i + 74));
       }
     }
     
@@ -380,6 +380,11 @@ function fixVEventStructure(lines: string[]): string[] {
   }
 
   function sortVEventFields(eventLines: string[]): string[] {
+    // Exclude BEGIN/END so we can always emit BEGIN:VEVENT first and END:VEVENT last
+    const contentLines = eventLines.filter(
+      (l) => l.toUpperCase() !== "BEGIN:VEVENT" && l.toUpperCase() !== "END:VEVENT"
+    );
+
     const fields = new Map<string, string[]>();
     const xFields: string[] = []; // X-* fields go at the end
     const otherFields: string[] = []; // Unknown fields
@@ -387,7 +392,7 @@ function fixVEventStructure(lines: string[]): string[] {
     let currentField: string | null = null;
     let currentFieldLines: string[] = [];
 
-    for (const line of eventLines) {
+    for (const line of contentLines) {
       const fieldName = getFieldName(line);
       
       if (fieldName === '') {
@@ -463,8 +468,9 @@ function fixVEventStructure(lines: string[]): string[] {
 
     if (upper === 'END:VEVENT') {
       if (insideVEvent) {
-        // Sort and fix the VEVENT
+        // Emit BEGIN:VEVENT first, then sorted properties, then END:VEVENT (RFC 5545 order)
         const sorted = sortVEventFields(currentVEvent);
+        result.push('BEGIN:VEVENT');
         result.push(...sorted);
         result.push('END:VEVENT');
         currentVEvent = [];
@@ -485,6 +491,7 @@ function fixVEventStructure(lines: string[]): string[] {
   // Handle case where file ends without END:VEVENT (shouldn't happen, but be safe)
   if (insideVEvent && currentVEvent.length > 0) {
     const sorted = sortVEventFields(currentVEvent);
+    result.push('BEGIN:VEVENT');
     result.push(...sorted);
     result.push('END:VEVENT');
   }
@@ -537,9 +544,8 @@ app.get("/calendar.ics", async (req: Request, res: Response): Promise<void> => {
 
     console.log(`[${new Date().toISOString()}] Transformed ICS data: ${out.length} characters`);
 
-    // Cache politely for 10 minutes; adjust to your needs
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=600");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.status(200).send(out);
     
     const duration = Date.now() - startTime;

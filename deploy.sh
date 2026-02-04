@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-STACK_NAME=${1:-outlookicsproxy}
+STACK_NAME=${1:-calendar}
 IMAGE_NAME="outlookicsproxy:latest"
 COMPOSE_FILE="docker-compose.yml"
 NO_BUILD=false
